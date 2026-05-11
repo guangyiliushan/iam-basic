@@ -1,3 +1,31 @@
 spring:
   application:
-    name: iam-baisc
+    name: iam-basic
+  datasource:
+    url: jdbc:postgresql://localhost:5432/iam
+    username: myuser
+    password: secret
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
+    show-sql: false
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/init/schema.sql
+#      data-locations: classpath:db/init/data.sql
+      platform: PostgreSQL
+      continue-on-error: true
+      encoding: UTF-8
+      separator: ;
+
+snowflake:
+  worker-id: 1
+  datacenter-id: 1
