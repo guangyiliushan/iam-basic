@@ -1,4 +1,4 @@
-package top.guangyiliushan.iam.shared
+package top.guangyiliushan.iam.shared.api
 
 import org.springframework.http.HttpStatus
 

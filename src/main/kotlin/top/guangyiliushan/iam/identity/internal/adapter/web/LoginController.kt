@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController
 import top.guangyiliushan.iam.identity.api.dto.command.LoginCmd
 import top.guangyiliushan.iam.identity.api.dto.result.LoginResult
 import top.guangyiliushan.iam.identity.internal.application.command.LoginCmdService
-import top.guangyiliushan.iam.shared.ApiResponse
+import top.guangyiliushan.iam.shared.api.ApiResponse
 
 @Tag(name = "IAM")
 @RestController

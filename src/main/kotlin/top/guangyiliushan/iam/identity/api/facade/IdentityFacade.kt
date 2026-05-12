@@ -14,7 +14,7 @@ interface IdentityFacade {
      *
      * @param cmd 登录命令，包含用户名和密码
      * @return 登录结果，包含用户ID
-     * @throws top.guangyiliushan.iam.shared.BusinessException 当凭证无效时抛出 INVALID_CREDENTIALS
+     * @throws top.guangyiliushan.iam.shared.error.BusinessException 当凭证无效时抛出 INVALID_CREDENTIALS
      */
     fun login(cmd: LoginCmd): LoginResult
 
@@ -23,7 +23,7 @@ interface IdentityFacade {
      *
      * @param cmd 注册命令，包含用户名和密码
      * @return 注册结果，包含用户ID
-     * @throws top.guangyiliushan.iam.shared.BusinessException 当用户名已存在时抛出 USERNAME_ALREADY_EXISTS
+     * @throws top.guangyiliushan.iam.shared.error.BusinessException 当用户名已存在时抛出 USERNAME_ALREADY_EXISTS
      */
     fun register(cmd: RegisterCmd): RegisterResult
 }

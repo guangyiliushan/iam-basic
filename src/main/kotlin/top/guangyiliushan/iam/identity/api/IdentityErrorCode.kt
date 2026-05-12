@@ -1,7 +1,7 @@
 package top.guangyiliushan.iam.identity.api
 
 import org.springframework.http.HttpStatus
-import top.guangyiliushan.iam.shared.ErrorCode
+import top.guangyiliushan.iam.shared.error.ErrorCode
 
 enum class IdentityErrorCode(
     override val code: Int,

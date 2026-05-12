@@ -1,10 +1,9 @@
-package top.guangyiliushan.iam.shared
+package top.guangyiliushan.iam.shared.config
 
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
 import org.springframework.web.servlet.config.annotation.ApiVersionConfigurer
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
-
 
 @Configuration
 class ApiConfig : WebMvcConfigurer {

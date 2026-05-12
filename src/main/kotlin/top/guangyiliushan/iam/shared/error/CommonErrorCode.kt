@@ -1,4 +1,4 @@
-package top.guangyiliushan.iam.shared
+package top.guangyiliushan.iam.shared.error
 
 import org.springframework.http.HttpStatus
 
@@ -22,6 +22,7 @@ enum class CommonErrorCode(
     INTERNAL_SERVER_ERROR(50000001, "系统内部错误", HttpStatus.INTERNAL_SERVER_ERROR),
     INTERNAL_SERVER_DB_ERROR(50000002, "数据库操作失败", HttpStatus.INTERNAL_SERVER_ERROR),
     INTERNAL_SERVER_THIRD_PARTY_ERROR(50000003, "第三方服务调用失败", HttpStatus.INTERNAL_SERVER_ERROR),
+    INTERNAL_SERVER_ID_GENERATION_ERROR(50000004, "ID生成失败", HttpStatus.INTERNAL_SERVER_ERROR),
     SERVICE_UNAVAILABLE(50300001, "服务暂不可用", HttpStatus.SERVICE_UNAVAILABLE),
     GATEWAY_TIMEOUT(50400001, "网关超时", HttpStatus.GATEWAY_TIMEOUT),
 }

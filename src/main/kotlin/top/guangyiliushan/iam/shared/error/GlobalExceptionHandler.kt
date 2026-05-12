@@ -1,4 +1,4 @@
-package top.guangyiliushan.iam
+package top.guangyiliushan.iam.shared.error
 
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.ConstraintViolationException
@@ -18,9 +18,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.util.HtmlUtils
 import org.springframework.web.servlet.NoHandlerFoundException
-import top.guangyiliushan.iam.shared.ApiResponse
-import top.guangyiliushan.iam.shared.BusinessException
-import top.guangyiliushan.iam.shared.CommonErrorCode
+import top.guangyiliushan.iam.shared.api.ApiResponse
+import top.guangyiliushan.iam.shared.id.SnowflakeGenerationException
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -239,6 +238,19 @@ class GlobalExceptionHandler {
             HttpStatus.CONFLICT,
             CommonErrorCode.CONFLICT_RESOURCE.code,
             "数据冲突",
+            request,
+            ex
+        )
+    }
+
+    @ExceptionHandler(SnowflakeGenerationException::class)
+    fun handleSnowflakeGenerationException(
+        ex: SnowflakeGenerationException,
+        request: HttpServletRequest
+    ): ResponseEntity<ApiResponse<Nothing>> {
+        return serverError(
+            CommonErrorCode.INTERNAL_SERVER_ID_GENERATION_ERROR.code,
+            CommonErrorCode.INTERNAL_SERVER_ID_GENERATION_ERROR.message,
             request,
             ex
         )

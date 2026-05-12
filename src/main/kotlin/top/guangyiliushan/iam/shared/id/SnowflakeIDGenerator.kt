@@ -1,4 +1,4 @@
-package top.guangyiliushan.iam.shared
+package top.guangyiliushan.iam.shared.id
 
 import org.hibernate.annotations.IdGeneratorType
 
