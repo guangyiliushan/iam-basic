@@ -1,15 +1,12 @@
 package top.guangyiliushan.iam.shared.id
 
 import jakarta.annotation.PostConstruct
-import org.hibernate.engine.spi.SharedSessionContractImplementor
-import org.hibernate.id.IdentifierGenerator
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
-import java.io.Serializable
 
 @Component
-class SnowflakeIdentifierGenerator : IdentifierGenerator {
+class SnowflakeIdService : SnowflakeIdGenerator {
 
     companion object {
         private const val START_TIMESTAMP = 1704067200000L // 2024-01-01 00:00:00
@@ -27,12 +24,12 @@ class SnowflakeIdentifierGenerator : IdentifierGenerator {
         private const val MAX_CLOCK_BACKWARD_MS = 5L
     }
 
-    private val logger = LoggerFactory.getLogger(SnowflakeIdentifierGenerator::class.java)
+    private val logger = LoggerFactory.getLogger(SnowflakeIdService::class.java)
 
-    @Value("\${snowflake.worker-id:1}")
+    @Value($$"${snowflake.worker-id:1}")
     private var workerId: Long = 1
 
-    @Value("\${snowflake.datacenter-id:1}")
+    @Value($$"${snowflake.datacenter-id:1}")
     private var datacenterId: Long = 1
 
     private var sequence = 0L
@@ -48,7 +45,8 @@ class SnowflakeIdentifierGenerator : IdentifierGenerator {
         logger.info("Snowflake ID generator initialized: workerId={}, datacenterId={}, startTimestamp={}", workerId, datacenterId, START_TIMESTAMP)
     }
 
-    override fun generate(session: SharedSessionContractImplementor, obj: Any?): Serializable {
+    @Synchronized
+    override fun generate(): Long {
         return try {
             nextId()
         } catch (ex: SnowflakeGenerationException) {
@@ -58,8 +56,7 @@ class SnowflakeIdentifierGenerator : IdentifierGenerator {
         }
     }
 
-    @Synchronized
-    fun nextId(): Long {
+    private fun nextId(): Long {
         ensureInitialized()
         var timestamp = currentTimestamp()
 

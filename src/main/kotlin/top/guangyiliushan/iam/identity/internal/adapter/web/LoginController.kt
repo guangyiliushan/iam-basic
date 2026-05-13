@@ -25,7 +25,10 @@ class LoginController(
             password = request.password
         )
         val loginResult = LoginResult(
-            userId = result
+            userId = result.accountId.toLong(),
+            accessToken = result.accessToken,
+            refreshToken = result.refreshToken,
+            accessTokenExpiresIn = (result.accessTokenExpiresAt.epochSecond - result.accessTokenIssuedAt.epochSecond)
         )
         return ResponseEntity.ok(ApiResponse.success(loginResult))
     }

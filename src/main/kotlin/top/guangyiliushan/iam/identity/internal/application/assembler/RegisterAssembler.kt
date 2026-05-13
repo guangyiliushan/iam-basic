@@ -4,7 +4,7 @@ import top.guangyiliushan.iam.identity.internal.domain.model.Account
 
 object RegisterAssembler {
 
-    fun toDomain(username : String, password : String, id: Long?): Account {
+    fun toDomain(username : String, password : String, id: Long): Account {
         return Account(
             id = id,
             username = username,

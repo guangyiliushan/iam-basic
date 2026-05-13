@@ -24,6 +24,23 @@ spring:
       continue-on-error: true
       encoding: UTF-8
       separator: ;
+
+iam:
+  security:
+    jwt:
+      issuer: "https://iam.guangyiliushan.top"
+      secret: "dGhpcyBpcyBhIHZlcnkgc2VjdXJlIGFuZCBsb25nIHNlY3JldCBrZXk=" # 必须是 Base64 编码的字符串，长度至少 32 字节 (HS256)
+      key-id: "identity-hs-kid"
+      mac-algorithm: HS256
+      access-token:
+        audience: "iam-api"
+        ttl: 15m
+        type: "at+jwt"
+      refresh-token:
+        audience: "iam-refresh"
+        ttl: 30d
+        type: "rt+jwt"
+
 springdoc:
   api-docs:
     enabled: true

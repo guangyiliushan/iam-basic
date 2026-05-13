@@ -16,11 +16,17 @@ class IdentityFacadeImpl(
 ) : IdentityFacade {
 
     override fun login(cmd: LoginCmd): LoginResult {
-        val userId = loginCmdService.login(
+        val result = loginCmdService.login(
             username = cmd.username,
             password = cmd.password
         )
-        return LoginResult(userId = userId)
+        val loginResult = LoginResult(
+            userId = result.accountId.toLong(),
+            accessToken = result.accessToken,
+            refreshToken = result.refreshToken,
+            accessTokenExpiresIn = (result.accessTokenExpiresAt.epochSecond - result.accessTokenIssuedAt.epochSecond)
+        )
+        return loginResult
     }
 
     override fun register(cmd: RegisterCmd): RegisterResult {
