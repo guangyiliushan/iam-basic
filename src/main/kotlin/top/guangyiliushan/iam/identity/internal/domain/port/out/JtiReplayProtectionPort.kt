@@ -1,4 +1,4 @@
-package top.guangyiliushan.iam.identity.internal.application.port.out
+package top.guangyiliushan.iam.identity.internal.domain.port.out
 
 import top.guangyiliushan.iam.identity.internal.domain.model.TokenUse
 import java.time.Duration

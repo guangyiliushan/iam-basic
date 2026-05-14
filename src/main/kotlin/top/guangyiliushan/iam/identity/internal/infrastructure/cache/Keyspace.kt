@@ -20,4 +20,7 @@ object Keyspace {
 
     fun refreshSessionKey(sessionId: String): String =
         "$ROOT:jwt:rt:session:$sessionId"
+
+    fun refreshAccountSessionsKey(accountId: String): String =
+        "$ROOT:jwt:rt:account:$accountId:sessions"
 }

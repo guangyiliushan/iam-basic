@@ -21,10 +21,9 @@ class IdentityFacadeImpl(
             password = cmd.password
         )
         val loginResult = LoginResult(
-            userId = result.accountId.toLong(),
+            userId = result.userId,
             accessToken = result.accessToken,
-            refreshToken = result.refreshToken,
-            accessTokenExpiresIn = (result.accessTokenExpiresAt.epochSecond - result.accessTokenIssuedAt.epochSecond)
+            accessTokenExpiresIn = result.accessTokenExpiresIn
         )
         return loginResult
     }

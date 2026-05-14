@@ -76,7 +76,13 @@ class SecurityConfig {
         val configuration = CorsConfiguration()
         configuration.allowedOriginPatterns = listOf("http://localhost:*")  // ← 允许的源（通配符端口）
         configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")  // ← 允许的 HTTP 方法
-        configuration.allowedHeaders = listOf("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With")  // ← 显式允许常用请求头
+        configuration.allowedHeaders = listOf(
+            "Authorization",
+            "Content-Type",
+            "Accept",
+            "Origin",
+            "X-Requested-With"
+        )  // ← 显式允许常用请求头
         configuration.exposedHeaders = listOf("Authorization")             // ← 暴露认证相关响应头
         configuration.allowCredentials = true                               // ← 允许携带凭证（Cookie）
         configuration.maxAge = 3600L                                        // ← 预检请求缓存 1 小时

@@ -2,7 +2,7 @@ package top.guangyiliushan.iam.identity.internal.infrastructure.cache
 
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Repository
-import top.guangyiliushan.iam.identity.internal.application.port.out.JtiReplayProtectionPort
+import top.guangyiliushan.iam.identity.internal.domain.port.out.JtiReplayProtectionPort
 import top.guangyiliushan.iam.identity.internal.domain.model.TokenUse
 import top.guangyiliushan.iam.identity.internal.infrastructure.config.IdentityCacheProperties
 

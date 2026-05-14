@@ -3,8 +3,9 @@ package top.guangyiliushan.iam.identity.internal.infrastructure.cache
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Repository
-import top.guangyiliushan.iam.identity.internal.application.port.out.RefreshTokenSessionCachePort
+import top.guangyiliushan.iam.identity.internal.domain.port.out.RefreshTokenSessionCachePort
 import top.guangyiliushan.iam.identity.internal.infrastructure.config.IdentityCacheProperties
+import top.guangyiliushan.iam.identity.internal.infrastructure.config.IdentityJwtProperties
 import java.time.Duration
 import java.time.Instant
 
@@ -12,17 +13,24 @@ import java.time.Instant
 class RefreshTokenSessionRepository(
     private val redisTemplate: StringRedisTemplate,
     private val cacheProperties: IdentityCacheProperties,
+    private val jwtProperties: IdentityJwtProperties,
     private val refreshTokenRotationScript: DefaultRedisScript<String>
 ) : RefreshTokenSessionCachePort {
 
     override fun save(record: RefreshTokenSessionCachePort.RefreshTokenSessionRecord): Boolean {
+        val ttl = record.ttl()
         val familyKey = Keyspace.refreshFamilyKey(record.tokenFamilyId)
         redisTemplate.opsForHash<String, String>().putAll(familyKey, toHash(record))
-        redisTemplate.expire(familyKey, record.ttl())
+        redisTemplate.expire(familyKey, ttl)
         redisTemplate.opsForValue()
-            .set(Keyspace.refreshTokenIndexKey(record.currentTokenId), record.tokenFamilyId, record.ttl())
+            .set(Keyspace.refreshTokenIndexKey(record.currentTokenId), record.tokenFamilyId, ttl)
         redisTemplate.opsForValue()
-            .set(Keyspace.refreshSessionKey(record.sessionId), record.tokenFamilyId, record.ttl())
+            .set(Keyspace.refreshSessionKey(record.sessionId), record.tokenFamilyId, ttl)
+        val accountSessionsKey = Keyspace.refreshAccountSessionsKey(record.accountId)
+        redisTemplate.opsForZSet().add(accountSessionsKey, record.sessionId, record.issuedAt.toEpochMilli().toDouble())
+        redisTemplate.expire(accountSessionsKey, ttl)
+        purgeStaleAccountSessions(record.accountId)
+        enforceConcurrentSessionLimit(record.accountId, record.sessionId)
         return true
     }
 
@@ -33,6 +41,14 @@ class RefreshTokenSessionRepository(
 
     override fun findByTokenId(tokenId: String): RefreshTokenSessionCachePort.RefreshTokenSessionRecord? =
         redisTemplate.opsForValue().get(Keyspace.refreshTokenIndexKey(tokenId))?.let(::findByFamilyId)
+
+    override fun findSessionIdsByAccountId(accountId: String, limit: Int): List<String> {
+        purgeStaleAccountSessions(accountId)
+        return redisTemplate.opsForZSet()
+            .reverseRange(Keyspace.refreshAccountSessionsKey(accountId), 0, (limit - 1).toLong())
+            ?.toList()
+            ?: emptyList()
+    }
 
     override fun rotate(command: RefreshTokenSessionCachePort.RefreshTokenRotationCommand): RefreshTokenSessionCachePort.RefreshTokenRotationResult {
         val current = findByFamilyId(command.tokenFamilyId)
@@ -61,6 +77,7 @@ class RefreshTokenSessionRepository(
         ) ?: "NOT_FOUND"
         return when (result) {
             "ROTATED" -> findByFamilyId(command.tokenFamilyId)?.let {
+                touchAccountSessionsKey(it.accountId, it.ttl())
                 RefreshTokenSessionCachePort.RefreshTokenRotationResult.Rotated(command.presentedTokenId, it)
             } ?: RefreshTokenSessionCachePort.RefreshTokenRotationResult.NotFound(command.tokenFamilyId)
 
@@ -79,6 +96,8 @@ class RefreshTokenSessionRepository(
 
     override fun revokeFamily(tokenFamilyId: String, revokedAt: Instant, reason: String): Boolean {
         val record = findByFamilyId(tokenFamilyId) ?: return false
+        redisTemplate.opsForZSet().remove(Keyspace.refreshAccountSessionsKey(record.accountId), record.sessionId)
+        cleanEmptyAccountSessionsKey(record.accountId)
         return unlink(
             Keyspace.refreshFamilyKey(tokenFamilyId),
             Keyspace.refreshTokenIndexKey(record.currentTokenId),
@@ -120,6 +139,51 @@ class RefreshTokenSessionRepository(
     )
 
     private fun ttlSeconds(expiresAt: Instant, now: Instant): Long = maxOf(1, Duration.between(now, expiresAt).seconds)
+
+    private fun enforceConcurrentSessionLimit(accountId: String, currentSessionId: String) {
+        val overflow = findOverflowSessionIds(accountId, currentSessionId)
+        if (overflow.isEmpty()) {
+            return
+        }
+        val revokedAt = Instant.now()
+        overflow.forEach { revokeSession(it, revokedAt, "concurrent_session_limit_exceeded") }
+    }
+
+    private fun findOverflowSessionIds(accountId: String, currentSessionId: String): List<String> {
+        val accountSessionsKey = Keyspace.refreshAccountSessionsKey(accountId)
+        val allSessionIds = redisTemplate.opsForZSet()
+            .range(accountSessionsKey, 0, -1)
+            ?.toList()
+            ?: emptyList()
+        val overflow = allSessionIds.size - jwtProperties.session.maxConcurrentSessions
+        if (overflow <= 0) {
+            return emptyList()
+        }
+        return allSessionIds
+            .filter { it != currentSessionId }
+            .take(overflow)
+    }
+
+    private fun purgeStaleAccountSessions(accountId: String) {
+        val accountSessionsKey = Keyspace.refreshAccountSessionsKey(accountId)
+        val sessionIds = redisTemplate.opsForZSet().range(accountSessionsKey, 0, -1) ?: return
+        val staleSessionIds = sessionIds.filter { redisTemplate.hasKey(Keyspace.refreshSessionKey(it)) != true }
+        if (staleSessionIds.isNotEmpty()) {
+            redisTemplate.opsForZSet().remove(accountSessionsKey, *staleSessionIds.toTypedArray())
+        }
+        cleanEmptyAccountSessionsKey(accountId)
+    }
+
+    private fun touchAccountSessionsKey(accountId: String, ttl: Duration) {
+        redisTemplate.expire(Keyspace.refreshAccountSessionsKey(accountId), ttl)
+    }
+
+    private fun cleanEmptyAccountSessionsKey(accountId: String) {
+        val accountSessionsKey = Keyspace.refreshAccountSessionsKey(accountId)
+        if ((redisTemplate.opsForZSet().zCard(accountSessionsKey) ?: 0) == 0L) {
+            unlink(accountSessionsKey)
+        }
+    }
 
     private fun unlink(vararg keys: String): Long = redisTemplate.execute { c ->
         val bytes = keys.filter { it.isNotBlank() }.map { it.toByteArray(Charsets.UTF_8) }.toTypedArray()

@@ -29,9 +29,14 @@ iam:
   security:
     jwt:
       issuer: "https://iam.guangyiliushan.top"
-      secret: "dGhpcyBpcyBhIHZlcnkgc2VjdXJlIGFuZCBsb25nIHNlY3JldCBrZXk=" # 必须是 Base64 编码的字符串，长度至少 32 字节 (HS256)
-      key-id: "identity-hs-kid"
-      mac-algorithm: HS256
+      client-id: "iam-basic"
+      signing:
+        active-key-id: "identity-hs-kid"
+        keys:
+          - id: "identity-hs-kid"
+            type: HS
+            mac-algorithm: HS256
+            secret: "dGhpcyBpcyBhIHZlcnkgc2VjdXJlIGFuZCBsb25nIHNlY3JldCBrZXk="
       access-token:
         audience: "iam-api"
         ttl: 15m
@@ -40,6 +45,21 @@ iam:
         audience: "iam-refresh"
         ttl: 30d
         type: "rt+jwt"
+      session:
+        max-concurrent-sessions: 5
+      refresh-token-cookie:
+        name: "IAM_REFRESH_TOKEN"
+        path: "/api/iam/refresh"
+        http-only: true
+        secure: true
+        same-site: STRICT
+        max-age: 30d
+
+  identity:
+    cache:
+      redis:
+        reuse-marker-ttl-floor: 1s
+        unlink-enabled: true
 
 springdoc:
   api-docs:

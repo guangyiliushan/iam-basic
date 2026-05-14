@@ -3,10 +3,10 @@ package top.guangyiliushan.iam.identity.internal.application.command
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import top.guangyiliushan.iam.identity.IdentityErrorCode
-import top.guangyiliushan.iam.identity.internal.application.port.out.AccessTokenPort
-import top.guangyiliushan.iam.identity.internal.application.port.out.JtiReplayProtectionPort
-import top.guangyiliushan.iam.identity.internal.application.port.out.RefreshTokenPort
-import top.guangyiliushan.iam.identity.internal.application.port.out.RefreshTokenSessionCachePort
+import top.guangyiliushan.iam.identity.internal.domain.port.out.AccessTokenPort
+import top.guangyiliushan.iam.identity.internal.domain.port.out.JtiReplayProtectionPort
+import top.guangyiliushan.iam.identity.internal.domain.port.out.RefreshTokenPort
+import top.guangyiliushan.iam.identity.internal.domain.port.out.RefreshTokenSessionCachePort
 import top.guangyiliushan.iam.identity.internal.domain.model.TokenUse
 import top.guangyiliushan.iam.identity.internal.infrastructure.config.IdentityJwtProperties
 import top.guangyiliushan.iam.shared.error.BusinessException
@@ -52,6 +52,7 @@ class AuthCmdService(
         val tokenFamilyId: String,
         val refreshRotation: Long
     )
+
     fun issueTokenPair(command: IssueTokenPairCommand): AuthTokenBundle {
         val accessToken = accessTokenPort.generateAccessToken(
             accountId = command.accountId,
@@ -69,8 +70,9 @@ class AuthCmdService(
             tokenFamilyId = command.tokenFamilyId,
             rotation = command.refreshRotation
         )
-        val refreshClaims = refreshTokenPort.validateRefreshToken(refreshToken)
-            ?: throw BusinessException(IdentityErrorCode.REFRESH_TOKEN_VALIDATION_FAILED)
+        val refreshClaims = refreshTokenPort.validateRefreshToken(refreshToken) ?: throw BusinessException(
+            IdentityErrorCode.REFRESH_TOKEN_VALIDATION_FAILED
+        )
         refreshTokenSessionCachePort.save(
             RefreshTokenSessionCachePort.RefreshTokenSessionRecord(
                 accountId = refreshClaims.accountId,
@@ -85,25 +87,7 @@ class AuthCmdService(
                 expiresAt = refreshClaims.expiresAt
             )
         )
-        return AuthTokenBundle(
-            accountId = command.accountId,
-            sessionId = command.sessionId,
-            deviceId = command.deviceId,
-            clientId = refreshClaims.clientId,
-            tokenType = "Bearer",
-            authorities = accessClaims.authorities,
-            tokenVersion = accessClaims.tokenVersion,
-            accessToken = accessToken,
-            accessTokenId = accessClaims.tokenId,
-            accessTokenIssuedAt = accessClaims.issuedAt,
-            accessTokenExpiresAt = accessClaims.expiresAt,
-            refreshToken = refreshToken,
-            refreshTokenId = refreshClaims.tokenId,
-            refreshTokenIssuedAt = refreshClaims.issuedAt,
-            refreshTokenExpiresAt = refreshClaims.expiresAt,
-            tokenFamilyId = refreshClaims.tokenFamilyId,
-            refreshRotation = refreshClaims.rotation
-        )
+        return buildTokenBundle(refreshClaims, accessClaims, accessToken, refreshClaims, refreshToken)
     }
 
     fun refresh(refreshToken: String): AuthTokenBundle {
@@ -120,7 +104,13 @@ class AuthCmdService(
             )
         )
         if (!replayAccepted) {
-            logger.warn("security_event=refresh_jti_replay_detected accountId={} sessionId={} tokenId={} familyId={}", claims.accountId, claims.sessionId, claims.tokenId, claims.tokenFamilyId)
+            logger.warn(
+                "security_event=refresh_jti_replay_detected accountId={} sessionId={} tokenId={} familyId={}",
+                claims.accountId,
+                claims.sessionId,
+                claims.tokenId,
+                claims.tokenFamilyId
+            )
             throw BusinessException(IdentityErrorCode.REFRESH_TOKEN_REPLAY_DETECTED)
         }
         val nextRefreshToken = refreshTokenPort.generateRefreshToken(
@@ -130,39 +120,64 @@ class AuthCmdService(
             tokenFamilyId = claims.tokenFamilyId,
             rotation = claims.rotation + 1
         )
-        val nextClaims = refreshTokenPort.validateRefreshToken(nextRefreshToken)
-            ?: throw BusinessException(IdentityErrorCode.REFRESH_TOKEN_ROTATION_VALIDATION_FAILED)
-        return when (
-            val rotationResult = refreshTokenSessionCachePort.rotate(
-                RefreshTokenSessionCachePort.RefreshTokenRotationCommand(
-                    presentedTokenId = claims.tokenId,
-                    presentedTokenHash = refreshTokenPort.hashRefreshToken(refreshToken),
-                    tokenFamilyId = claims.tokenFamilyId,
-                    nextTokenId = nextClaims.tokenId,
-                    nextTokenHash = refreshTokenPort.hashRefreshToken(nextRefreshToken),
-                    nextRotation = nextClaims.rotation,
-                    rotatedAt = Instant.now(),
-                    nextExpiresAt = nextClaims.expiresAt,
-                    reuseDetectionWindow = jwtProperties.refreshReuseDetectionWindow
-                )
+        val nextClaims = refreshTokenPort.validateRefreshToken(nextRefreshToken) ?: throw BusinessException(
+            IdentityErrorCode.REFRESH_TOKEN_ROTATION_VALIDATION_FAILED
+        )
+        return when (refreshTokenSessionCachePort.rotate(
+            RefreshTokenSessionCachePort.RefreshTokenRotationCommand(
+                presentedTokenId = claims.tokenId,
+                presentedTokenHash = refreshTokenPort.hashRefreshToken(refreshToken),
+                tokenFamilyId = claims.tokenFamilyId,
+                nextTokenId = nextClaims.tokenId,
+                nextTokenHash = refreshTokenPort.hashRefreshToken(nextRefreshToken),
+                nextRotation = nextClaims.rotation,
+                rotatedAt = Instant.now(),
+                nextExpiresAt = nextClaims.expiresAt,
+                reuseDetectionWindow = jwtProperties.refreshReuseDetectionWindow
             )
-        ) {
+        )) {
             is RefreshTokenSessionCachePort.RefreshTokenRotationResult.Rotated -> {
-                val accessToken = accessTokenPort.generateAccessToken(claims.accountId, claims.sessionId, emptyList(), 0, claims.deviceId)
-                val accessClaims = accessTokenPort.validateAccessToken(accessToken)
-                    ?: throw BusinessException(IdentityErrorCode.ACCESS_TOKEN_ROTATION_VALIDATION_FAILED)
+                val accessToken = accessTokenPort.generateAccessToken(
+                    claims.accountId, claims.sessionId, emptyList(), 0, claims.deviceId
+                )
+                val accessClaims = accessTokenPort.validateAccessToken(accessToken) ?: throw BusinessException(
+                    IdentityErrorCode.ACCESS_TOKEN_ROTATION_VALIDATION_FAILED
+                )
                 buildTokenBundle(claims, accessClaims, accessToken, nextClaims, nextRefreshToken)
             }
+
             is RefreshTokenSessionCachePort.RefreshTokenRotationResult.ReuseDetected -> {
-                logger.warn("security_event=refresh_token_reuse_detected accountId={} sessionId={} tokenId={} familyId={}", claims.accountId, claims.sessionId, claims.tokenId, claims.tokenFamilyId)
+                logger.warn(
+                    "security_event=refresh_token_reuse_detected accountId={} sessionId={} tokenId={} familyId={}",
+                    claims.accountId,
+                    claims.sessionId,
+                    claims.tokenId,
+                    claims.tokenFamilyId
+                )
                 refreshTokenSessionCachePort.revokeFamily(claims.tokenFamilyId, Instant.now(), "reuse_detected")
                 throw BusinessException(IdentityErrorCode.REFRESH_TOKEN_REUSE_DETECTED)
             }
-            is RefreshTokenSessionCachePort.RefreshTokenRotationResult.HashMismatch -> throw BusinessException(IdentityErrorCode.INVALID_REFRESH_TOKEN)
-            is RefreshTokenSessionCachePort.RefreshTokenRotationResult.Revoked -> throw BusinessException(IdentityErrorCode.REFRESH_TOKEN_REVOKED)
-            is RefreshTokenSessionCachePort.RefreshTokenRotationResult.NotFound -> throw BusinessException(IdentityErrorCode.REFRESH_TOKEN_REVOKED)
+
+            is RefreshTokenSessionCachePort.RefreshTokenRotationResult.HashMismatch -> throw BusinessException(
+                IdentityErrorCode.INVALID_REFRESH_TOKEN
+            )
+
+            is RefreshTokenSessionCachePort.RefreshTokenRotationResult.Revoked -> throw BusinessException(
+                IdentityErrorCode.REFRESH_TOKEN_REVOKED
+            )
+
+            is RefreshTokenSessionCachePort.RefreshTokenRotationResult.NotFound -> throw BusinessException(
+                IdentityErrorCode.REFRESH_TOKEN_REVOKED
+            )
         }
     }
+
+    fun logout(sessionId: String) {
+        refreshTokenSessionCachePort.revokeSession(sessionId, Instant.now(), "user_logout")
+    }
+
+    fun resolveSessionId(refreshToken: String): String? =
+        refreshTokenPort.validateRefreshToken(refreshToken)?.sessionId
 
     private fun buildTokenBundle(
         refreshClaims: RefreshTokenPort.RefreshTokenClaims,

@@ -1,4 +1,4 @@
-package top.guangyiliushan.iam.identity.internal.application.port.out
+package top.guangyiliushan.iam.identity.internal.domain.port.out
 
 import java.time.Duration
 import java.time.Instant
@@ -10,6 +10,8 @@ interface RefreshTokenSessionCachePort {
     fun findByFamilyId(tokenFamilyId: String): RefreshTokenSessionRecord?
 
     fun findByTokenId(tokenId: String): RefreshTokenSessionRecord?
+
+    fun findSessionIdsByAccountId(accountId: String, limit: Int = 100): List<String>
 
     fun rotate(command: RefreshTokenRotationCommand): RefreshTokenRotationResult
 
